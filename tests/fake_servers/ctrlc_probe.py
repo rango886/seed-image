@@ -1,4 +1,4 @@
-"""验证 Ctrl+C 能否立刻结束一条阻塞中的 ai-cli 命令。
+"""验证 Ctrl+C 能否立刻结束一条阻塞中的 seed-image 命令。
 
 必须与被测进程处在同一个控制台（CREATE_NEW_PROCESS_GROUP 的子进程会直接忽略
 CTRL_C_EVENT，那样测不出任何东西），所以本进程先把 SIGINT 变成空操作，
@@ -28,7 +28,7 @@ httpx.post(  # steps == -1 让 fake_comfy 永远返回 in_progress
 )
 
 proc = subprocess.Popen(
-    [sys.executable, "-m", "ai_cli", "comfyui", "job", "wait", job_id, "--timeout", "120"]
+    [sys.executable, "-m", "seed_image", "comfyui", "job", "wait", job_id, "--timeout", "120"]
 )
 time.sleep(3)
 print("--- sending CTRL_C_EVENT to console group ---", flush=True)

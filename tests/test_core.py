@@ -6,18 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from ai_cli.comfy.waiting import wait_for_jobs
-from ai_cli.core import naming
-from ai_cli.core.imageparams import build_request
-from ai_cli.core.values import (
+from seed_image.comfy.waiting import wait_for_jobs
+from seed_image.core import naming
+from seed_image.core.imageparams import build_request
+from seed_image.core.values import (
     UploadRequest,
     apply_assignments,
     parse_assignment,
     resolve_uploads,
     uploads_in,
 )
-from ai_cli.core.workflow import inspect_inputs, validate_workflow
-from ai_cli.errors import AppError
+from seed_image.core.workflow import inspect_inputs, validate_workflow
+from seed_image.errors import AppError
 
 WORKFLOW = {
     "7": {"class_type": "KSampler", "inputs": {"seed": 1, "steps": 20, "model": ["4", 0]}},

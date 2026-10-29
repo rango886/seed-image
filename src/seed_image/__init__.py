@@ -1,4 +1,4 @@
-"""ai-cli 入口。"""
+"""seed-image 入口。"""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 [project]
-name = "ai-cli"
+name = "seed-image"
 version = "0.1.0"
 description = "给 AI agent 用的图像生成 CLI：ComfyUI 工作流 + OpenAI 兼容图片接口"
 readme = "README.md"
@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ai-cli = "ai_cli:main"
+seed-image = "seed_image:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

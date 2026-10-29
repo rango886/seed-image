@@ -1,4 +1,4 @@
-"""`ai-cli openai-image` 子命令。"""
+"""`seed-image openai-image` 子命令。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Annotated
 
 import typer
 
+from .. import config
 from ..core.imageparams import build_request, with_images
 from ..errors import ExitCode
 from ..images import client as api
@@ -16,16 +17,22 @@ from .context import FormatOption, resolve_format, run
 
 image_app = typer.Typer(
     no_args_is_help=True,
-    help=f"调用 OpenAI 兼容的图片接口（地址与密钥取自 {api.BASE_URL_ENV} / {api.API_KEY_ENV}）。",
+    help=(
+        "调用 OpenAI 兼容的图片接口。地址与密钥取自环境变量 "
+        f"{config.OPENAI_BASE_URL.env} / {config.OPENAI_API_KEY.env}，"
+        f"或配置文件里的 {config.OPENAI_BASE_URL.key} / {config.OPENAI_API_KEY.key}。"
+    ),
 )
+
+MODEL_HELP = f"模型名（默认取配置 {config.OPENAI_MODEL.key}，未配置则 {config.OPENAI_MODEL.default}）"
 
 GENERATE_EPILOG = """\b
 示例：
-  ai-cli openai-image generate --prompt "生成个城市夜景" --number 2
+  seed-image openai-image generate --prompt "生成个城市夜景" --number 2
 """
 EDIT_EPILOG = """\b
 示例：
-  ai-cli openai-image edit --prompt "把图一的帽子戴在图二的人物上，用图三的画风" \\
+  seed-image openai-image edit --prompt "把图一的帽子戴在图二的人物上，用图三的画风" \\
     --input-image a.png --input-image b.png --input-image c.png
 """
 
@@ -34,7 +41,7 @@ EDIT_EPILOG = """\b
 def generate(
     ctx: typer.Context,
     prompt: Annotated[str, typer.Option("--prompt", help="生成提示词")],
-    model: Annotated[str, typer.Option("--model")] = "gpt-image-2",
+    model: Annotated[str | None, typer.Option("--model", help=MODEL_HELP, show_default=False)] = None,
     size: Annotated[str, typer.Option("--size")] = "auto",
     quality: Annotated[str, typer.Option("--quality")] = "auto",
     background: Annotated[str, typer.Option("--background", help="背景，原样透传给接口")] = "auto",
@@ -49,7 +56,7 @@ def generate(
 
     def produce() -> Output:
         request = build_request(
-            prompt=prompt, model=model, size=size, quality=quality,
+            prompt=prompt, model=config.value(config.OPENAI_MODEL, model) or "", size=size, quality=quality,
             background=background, number=number,
         )
         client = api.make_client(timeout=timeout, max_retries=max_retries)
@@ -69,7 +76,7 @@ def edit(
     ctx: typer.Context,
     prompt: Annotated[str, typer.Option("--prompt", help="编辑指令")],
     input_image: Annotated[list[Path], typer.Option("--input-image", help="本地参考图，可重复；按 base64 传入接口")],
-    model: Annotated[str, typer.Option("--model")] = "gpt-image-2",
+    model: Annotated[str | None, typer.Option("--model", help=MODEL_HELP, show_default=False)] = None,
     size: Annotated[str, typer.Option("--size")] = "auto",
     quality: Annotated[str, typer.Option("--quality")] = "auto",
     background: Annotated[str, typer.Option("--background", help="背景，原样透传给接口")] = "auto",
@@ -85,7 +92,7 @@ def edit(
     def produce() -> Output:
         request = with_images(
             build_request(
-                prompt=prompt, model=model, size=size, quality=quality,
+                prompt=prompt, model=config.value(config.OPENAI_MODEL, model) or "", size=size, quality=quality,
                 background=background, number=number,
             ),
             tuple(input_image),

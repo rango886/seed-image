@@ -53,29 +53,38 @@ def save_response(
         except AppError as exc:
             failures.append(f"第 {index} 张：{exc.message}")
             continue
-        target = directory / image_name(prompt, index, uid, ext)
-        target.write_bytes(payload)
-        paths.append(target)
+        paths.append(write_image(directory, prompt, index, uid, ext, payload))
 
     if not save_params:
         return Saved(tuple(paths), None, tuple(failures))
 
-    sidecar = directory / sidecar_name(prompt, uid)
-    sidecar.write_text(
-        json.dumps(
-            {
-                "endpoint": endpoint,
-                "request": dict(request.body) | _hide_images(request.body),
-                "response": _without_payload(response),
-                "images": [p.name for p in paths],
-                "failures": failures,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
+    sidecar = write_sidecar(
+        directory, prompt, uid,
+        {
+            "endpoint": endpoint,
+            "request": dict(request.body) | _hide_images(request.body),
+            "response": _without_payload(response),
+            "images": [p.name for p in paths],
+            "failures": failures,
+        },
     )
     return Saved(tuple(paths), sidecar, tuple(failures))
+
+
+def write_image(directory: Path, prompt: str, index: int, uid: str, ext: str, payload: bytes) -> Path:
+    """按 `提示词前20字-序号-uid.ext` 落盘一张图。"""
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / image_name(prompt, index, uid, ext)
+    target.write_bytes(payload)
+    return target
+
+
+def write_sidecar(directory: Path, prompt: str, uid: str, record: Mapping[str, Any]) -> Path:
+    """与一批图片同源的参数记录。调用方负责保证 record 里没有 api key 和 base64 正文。"""
+    directory.mkdir(parents=True, exist_ok=True)
+    sidecar = directory / sidecar_name(prompt, uid)
+    sidecar.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    return sidecar
 
 
 def _decode(item: Any) -> bytes:

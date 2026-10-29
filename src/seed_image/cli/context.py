@@ -51,7 +51,7 @@ def run(fmt: str, produce: Callable[[], Output]) -> None:
         emit_error(err, fmt)
         raise typer.Exit(err.exit_code) from None
     except KeyboardInterrupt:
-        note("interrupted：已提交的任务仍在服务端执行；用 `ai-cli comfyui job list` 找回 job id")
+        note("interrupted：已提交的任务仍在服务端执行；用 `seed-image comfyui job list` 找回 job id")
         raise typer.Exit(ExitCode.INTERRUPTED) from None
     emit_output(out, fmt)
     raise typer.Exit(out.exit_code)
@@ -74,7 +74,7 @@ def _await(produce: Callable[[], Output]) -> Output:
         finally:
             done.set()
 
-    threading.Thread(target=target, daemon=True, name="ai-cli-main").start()
+    threading.Thread(target=target, daemon=True, name="seed-image-main").start()
     while not done.wait(0.2):  # 带超时的等待才能在 Windows 上被 Ctrl+C 打断
         pass
     if "exc" in box:

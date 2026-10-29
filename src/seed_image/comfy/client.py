@@ -14,8 +14,6 @@ import httpx
 
 from ..errors import AppError, ExitCode, input_error
 
-DEFAULT_SERVER = "http://127.0.0.1:8188"
-
 
 def make_client(server: str, timeout: float = 60.0) -> httpx.Client:
     """建立指向某个 ComfyUI 服务端的连接。调用方负责关闭。"""

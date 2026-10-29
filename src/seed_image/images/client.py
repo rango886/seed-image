@@ -7,24 +7,28 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any, Mapping
 
 from openai import APIStatusError, OpenAI, OpenAIError
 
+from .. import config
 from ..core.imageparams import ImageRequest
 from ..errors import AppError, ExitCode, input_error
 
-BASE_URL_ENV = "HUB_BASE_URL"
-API_KEY_ENV = "HUB_API_KEY"
-
 
 def make_client(*, timeout: float, max_retries: int) -> OpenAI:
-    base_url = os.environ.get(BASE_URL_ENV)
-    api_key = os.environ.get(API_KEY_ENV)
-    missing = [name for name, value in ((BASE_URL_ENV, base_url), (API_KEY_ENV, api_key)) if not value]
+    loaded = config.load_config()
+    base_url = config.lookup(config.OPENAI_BASE_URL, loaded).value
+    api_key = config.lookup(config.OPENAI_API_KEY, loaded).value
+    missing = [
+        s for s, v in ((config.OPENAI_BASE_URL, base_url), (config.OPENAI_API_KEY, api_key)) if not v
+    ]
     if missing:
-        raise input_error("missing_credentials", f"缺少环境变量：{', '.join(missing)}")
+        hint = "；".join(f"环境变量 {s.env} 或配置项 {s.key}" for s in missing)
+        raise input_error(
+            "missing_credentials",
+            f"缺少图片接口凭证，请设置：{hint}（配置文件：{config.config_path()}）",
+        )
     return OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=max_retries)
 
 

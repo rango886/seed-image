@@ -1,27 +1,24 @@
-"""`ai-cli comfyui` 子命令。"""
+"""`seed-image comfyui` 子命令。"""
 
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Annotated, Any, Mapping, Sequence
 
 import httpx
 import typer
 
+from .. import config
 from ..comfy import client as api
 from ..comfy import outputs as products
 from ..comfy import service
-from ..comfy.client import DEFAULT_SERVER
 from ..comfy.waiting import CANCELLED, FAILED, WaitOutcome, wait_for_jobs
 from ..core.values import parse_assignment
 from ..core.workflow import inspect_inputs, load_workflow
 from ..errors import AppError, ExitCode
 from ..render import Output, note
 from .context import FormatOption, ServerOption, resolve, resolve_format, run, store
-
-SERVER_ENV = "COMFYUI_SERVER"
 
 comfyui_app = typer.Typer(no_args_is_help=True, help="包装本地 ComfyUI 的 HTTP 接口。")
 job_app = typer.Typer(no_args_is_help=True, help="提交 / 等待 / 查询 / 取消任务。")
@@ -31,12 +28,12 @@ comfyui_app.add_typer(workflow_app, name="workflow")
 
 SUBMIT_EPILOG = """\b
 示例：
-  ai-cli comfyui job submit --workflow wf.json \\
+  seed-image comfyui job submit --workflow wf.json \\
     --values "75:74.inputs.text=一只柯基穿着西装" \\
     --values "7.inputs.seed=42" --values "7.inputs.steps=30"
 
   # 本地文件用 @upload{...} 包围，提交前自动上传（图片/视频/音频/文本通用）
-  ai-cli comfyui job submit --workflow wf.json \\
+  seed-image comfyui job submit --workflow wf.json \\
     --values "10.inputs.image=@upload{./cat.png}" --mode async
 """
 
@@ -68,9 +65,9 @@ def submit(
     fmt: FormatOption = None,
 ) -> None:
     output_format = resolve_format(ctx, fmt)
-    base = resolve(ctx, "server", server, os.environ.get(SERVER_ENV) or DEFAULT_SERVER)
 
     def produce() -> Output:
+        base = _server(ctx, server)
         _require(mode in ("sync", "async"), "invalid_mode", f"--mode 只能是 sync 或 async，实际得到 {mode!r}")
         _require_on_timeout(on_timeout)
         graph = load_workflow(workflow)
@@ -113,9 +110,9 @@ def wait(
     fmt: FormatOption = None,
 ) -> None:
     output_format = resolve_format(ctx, fmt)
-    base = resolve(ctx, "server", server, os.environ.get(SERVER_ENV) or DEFAULT_SERVER)
 
     def produce() -> Output:
+        base = _server(ctx, server)
         _require_on_timeout(on_timeout)
         with api.make_client(base) as http:
             return _wait_and_collect(
@@ -134,9 +131,9 @@ def status(
     fmt: FormatOption = None,
 ) -> None:
     output_format = resolve_format(ctx, fmt)
-    base = resolve(ctx, "server", server, os.environ.get(SERVER_ENV) or DEFAULT_SERVER)
 
     def produce() -> Output:
+        base = _server(ctx, server)
         with api.make_client(base) as http:
             jobs = [_summary(job_id, api.get_job(http, job_id)) for job_id in job_ids]
         _report_errors(jobs)
@@ -157,9 +154,9 @@ def cancel(
     fmt: FormatOption = None,
 ) -> None:
     output_format = resolve_format(ctx, fmt)
-    base = resolve(ctx, "server", server, os.environ.get(SERVER_ENV) or DEFAULT_SERVER)
 
     def produce() -> Output:
+        base = _server(ctx, server)
         with api.make_client(base) as http:
             results = [
                 {"job_id": job_id, "cancelled": bool(api.cancel_job(http, job_id).get("cancelled"))}
@@ -183,9 +180,9 @@ def list_jobs(
     fmt: FormatOption = None,
 ) -> None:
     output_format = resolve_format(ctx, fmt)
-    base = resolve(ctx, "server", server, os.environ.get(SERVER_ENV) or DEFAULT_SERVER)
 
     def produce() -> Output:
+        base = _server(ctx, server)
         with api.make_client(base) as http:
             body = api.list_jobs(http, status=status_filter, limit=limit, offset=offset)
         jobs = body.get("jobs") or []
@@ -266,7 +263,7 @@ def _timeout_note(outcome: WaitOutcome, on_timeout: str) -> dict[str, Any]:
         "unfinished": unfinished,
         "action": on_timeout,
         "hint": (
-            "任务仍在服务端执行；用 `ai-cli comfyui job wait "
+            "任务仍在服务端执行；用 `seed-image comfyui job wait "
             f"{' '.join(unfinished)} --timeout 600` 继续等待"
             if on_timeout == "keep"
             else "已请求取消这些任务"
@@ -301,6 +298,11 @@ def _exit_code(jobs: Sequence[Mapping[str, Any]], *, timed_out: bool) -> int:
     if CANCELLED in statuses:
         return ExitCode.JOB_CANCELED
     return ExitCode.OK
+
+
+def _server(ctx: typer.Context, override: str | None) -> str:
+    """--server（任意一层） > COMFYUI_SERVER > 配置文件 comfyui.server > 默认值。"""
+    return resolve(ctx, "server", override, "") or config.value(config.COMFYUI_SERVER) or ""
 
 
 def _require(condition: bool, code: str, message: str) -> None:

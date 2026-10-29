@@ -1,4 +1,4 @@
-"""最小 ComfyUI 假服务端，只为端到端验证 ai-cli 的调用路径。仅测试用。"""
+"""最小 ComfyUI 假服务端，只为端到端验证 seed-image 的调用路径。仅测试用。"""
 
 from __future__ import annotations
 

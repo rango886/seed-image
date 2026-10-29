@@ -179,7 +179,7 @@ def _path_error(item: Assignment, key: str, available: Sequence[str]) -> Excepti
     return input_error(
         "path_not_found",
         f"路径 {'.'.join(item.path)} 在 workflow 中不存在（卡在 {key!r}）。"
-        f" 用 `ai-cli comfyui workflow inspect <workflow.json>` 查看可用路径。",
+        f" 用 `seed-image comfyui workflow inspect <workflow.json>` 查看可用路径。",
         values=item.source,
         stuck_at=key,
         available=list(available)[:40],
