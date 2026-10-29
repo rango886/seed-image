@@ -1,11 +1,11 @@
 ---
 name: seed-image
-description: 用 seed-image 生成/编辑图片。包装本地 ComfyUI 工作流（flux2_klein 图片编辑、黑白底图还原透明度）、OpenAI 兼容的 images 接口（主推 gpt-image）与 Gemini 原生图片接口（Nano Banana）。当需要出图、改图、抠图/还原透明通道、批量并发生图时使用。
+description: 用 seed-image 生成/编辑图片。包装本地 ComfyUI 工作流（krea2 生图、Qwen 改图、提示词抠图 / 主体背景分离 / 自动抠图、SeedVR2 放大）、OpenAI 兼容的 images 接口（主推 gpt-image）与 Gemini 原生图片接口（Nano Banana）。当需要出图、改图、抠图/还原透明通道、批量并发生图时使用。
 ---
 
 # seed-image
 
-统一入口 `seed-image`（已全局安装）。stdout 只有结果，stderr 是进度，退出码有契约。
+统一入口 `seed-image` 。stdout 只有结果，stderr 是进度，退出码有契约。
 给 agent 用时加 `--format json`，stdout 恰好一个 JSON 对象。示例全部为 bash；
 POSIX shell 下 `--values` 一律**单引号**（防 `{}` 展开与中文/空格拆分），PowerShell 换双引号。
 
@@ -16,14 +16,24 @@ POSIX shell 下 `--values` 一律**单引号**（防 `{}` 展开与中文/空格
 配置优先级：命令行参数 > 环境变量 > `~/.config/seed-image/config.toml`（可用 `SEED_IMAGE_CONFIG` 改路径）> 内置默认值。
 `seed-image config show` 列出每项生效值与来源（api_key 打码）。
 
-## 工作流清单
+## ComfyUI 工作流
 
-| 工作流文件 | 用途 | 参数 |
-| --- | --- | --- |
-| V:\software\AI\comfyui-workflows\krea2.json | krea2 生图模型，单次约 10–20s | `85.inputs.value` 提示词<br>`91.inputs.value` 宽<br>`92.inputs.value` 高 |
-| `D:\TOOLS\workflow\flux2_klein.json` | flux2_klein 编辑图片，单次约 10–20s | `75:74.inputs.text` 提示词<br>`76.inputs.image` 参考图 |
-| `D:\TOOLS\workflow\抠出图片中主体.json` | 自动抠主体（简单边缘） | `2.inputs.image` 输入图片 |
-| `D:\TOOLS\workflow\抠出图片中半透明或是不清晰边缘的主体.json` | 抠半透明/模糊边缘主体 | `76.inputs.image` 输入图片<br>`168:165.inputs.text` 提示词1→白底，例：保持主体位置和大小不变，保持光照不变，仅将背景变成白色<br>`75:74.inputs.text` 提示词2→黑底，例：保持主体位置和大小不变，保持光照不变，仅将背景变成黑色 |
+| 文件 | 干什么 | 要输入图 | 耗时 | 关键参数 |
+| --- | --- | --- | --- | --- |
+| `krea2.json` | Krea2 文生图 | 不用 | 10–20s | `85.inputs.value` 提示词<br>`91`/`92.inputs.value` 宽/高<br>`30:3.inputs.seed` 种子 |
+| `qwen-edit.json` | Qwen-Image 2.1 改图（质量档），支持透明背景，可以当抠图模型| 要 | 30–60s | `470.inputs.image`<br>`503.inputs.value` 提示词 |
+| `qwen-edit-turbo.json` | Qwen-Image 2.1 Turbo 改图（快档），支持透明背景，可以当抠图模型| 要 | ~15s | `470.inputs.image`<br>`509.inputs.value` 提示词 |
+| `bg-remove-auto.json` | 纯抠图，不跑扩散，硬边缘 | 要 | 1–3s | `23.inputs.image`<br>`22:14.inputs.bg_removal_name` = `lucida.safetensors` / `birefnet.safetensors`  默认lucida |
+| `seedvr2-upscale.json` | SeedVR2 放大加细节 | 要 | 视倍数 | `1.inputs.image`<br>`77.inputs.value` 倍数 1–4 |
+
+除 `krea2.json` 外都要 `--values '...=@upload{./x.png}'` 传图。所有 LoadImage 的 `image` 都已清空成 `""`，不传图直接跑会报找不到文件。
+
+改非关键参数前先知道这些：
+
+- **Qwen 改图两档结构一样**，区别只在模型和采样。推荐使用 Qwen-Image 2.1 Turbo，速度快，质量也不错。
+- 「优化提示词」开关（`qwen-edit.json` 的 `504`、`qwen-edit-turbo`  的 `510`）**默认关着**。开了会先用 `qwen3.5_9b_qwen_image_2.1_pe_i2i` 把提示词扩写一遍再进编码器，多花几十秒，而且占用很大显存；推荐ai agent 调用的时候直接写提示词，不用这个优化提示词开关，这个开关是给人类用的（`--values '504.inputs.value=true'`）。
+- **`bg-remove-auto`** 是 `RemoveBackground` 硬抠，不走扩散，1–3s。`22:14.inputs.bg_removal_name` 只有两个可选：`lucida.safetensors`（默认，细节多，发丝好些，支持半透明）、`birefnet.safetensors`（边缘稳，无透明度）。
+- **`seedvr2-upscale`** 1 步蒸馏（steps 1 / denoise 1），VAE 分块 512/overlap 128。默认倍数 4，显存吃紧降到 2；这些采样参数别乱动。
 
 ## ComfyUI
 
@@ -34,26 +44,36 @@ POSIX shell 下 `--values` 一律**单引号**（防 `{}` 展开与中文/空格
 常用（sync 会阻塞到完成并下载产物）：
 
 ```bash
-# 编辑图片
-seed-image comfyui job submit --workflow 'D:/TOOLS/workflow/flux2_klein.json' \
-  --values '75:74.inputs.text=把背景换成雪山黄昏' \
-  --values '76.inputs.image=@upload{./cat.png}' \
+WF=~/.config/seed-image/comfyui-workflows
+
+# 改图（Qwen 2.1 Turbo，~15s）
+seed-image comfyui job submit --workflow $WF/qwen-edit-turbo.json \
+  --values '470.inputs.image=@upload{./cat.png}' \
+  --values '509.inputs.value=把背景换成雪山黄昏' \
   --output-path out --format json
 
-# 抠图（简单边缘）
-seed-image comfyui job submit --workflow 'D:/TOOLS/workflow/抠出图片中主体.json' \
-  --values '2.inputs.image=@upload{./logo.png}' --output-path out
+# 抠图（提示词指定物体，保发丝/半透明）
+seed-image comfyui job submit --workflow $WF/qwen-cutout-prompt.json \
+  --values '470.inputs.image=@upload{./logo.png}' \
+  --values '509.inputs.value=把相机抠出来，透明背景' --output-path out --format json
+
+# 硬边缘抠图：不跑扩散，秒回
+seed-image comfyui job submit --workflow $WF/bg-remove-auto.json \
+  --values '23.inputs.image=@upload{./logo.png}' --output-path out --format json
 
 # 改清单外的参数前先自省，别把整个 json 读进上下文
-seed-image comfyui workflow inspect 'D:/TOOLS/workflow/flux2_klein.json' --filter text
-seed-image comfyui job submit --workflow wf.json --values '7.inputs.seed=42' --dry-run  # 只看补丁结果
+seed-image comfyui workflow inspect $WF/qwen-edit-turbo.json --filter text
+seed-image comfyui job submit --workflow $WF/krea2.json --values '30:3.inputs.seed=42' --dry-run  # 只看补丁结果
 ```
 
 并发：async 提交 + `job wait` 一次收网，不要自己写并发循环。
 
 ```bash
-a=$(seed-image comfyui job submit --workflow wf.json --values '7.inputs.seed=1' --mode async)
-b=$(seed-image comfyui job submit --workflow wf.json --values '7.inputs.seed=2' --mode async)
+WF=~/.config/seed-image/comfyui-workflows
+a=$(seed-image comfyui job submit --workflow $WF/krea2.json \
+  --values '85.inputs.value=一只柯基' --values '30:3.inputs.seed=1' --mode async)
+b=$(seed-image comfyui job submit --workflow $WF/krea2.json \
+  --values '85.inputs.value=一只柴犬' --values '30:3.inputs.seed=2' --mode async)
 seed-image comfyui job wait "$a" "$b" --output-path out --timeout 600 --format json
 ```
 
@@ -61,8 +81,9 @@ seed-image comfyui job wait "$a" "$b" --output-path out --timeout 600 --format j
 
 ```bash
 seed-image comfyui job submit \
-  --workflow wf.json \
-  --values '75:74.inputs.text=提示词' --values '7.inputs.seed=42' --values '7.inputs.steps=30' \
+  --workflow ~/.config/seed-image/comfyui-workflows/qwen-edit.json \
+  --values '470.inputs.image=@upload{./a.png}' --values '503.inputs.value=提示词' \
+  --values '459:458.inputs.seed=42' --values '459:458.inputs.steps=30' \
   --mode sync \            # sync=等待并下载 / async=只返回 job id
   --output-path out \      # 默认 .
   --timeout 300 \          # sync 最长等待秒数
@@ -78,12 +99,13 @@ seed-image comfyui job wait ID1 ID2 --output-path out --timeout 300 --poll 1 \
 seed-image comfyui job status ID1 ID2 --format json          # 只查状态，不下载
 seed-image comfyui job cancel ID1 --format json              # 幂等，已完成返回 cancelled=false
 seed-image comfyui job list --status pending,in_progress,completed,failed --limit 20 --offset 0
-seed-image comfyui workflow inspect wf.json --filter Sampler --format json
+seed-image comfyui workflow inspect ~/.config/seed-image/comfyui-workflows/seedvr2-upscale.json --filter Sampler --format json
 ```
 
 服务器地址：`--server` > `COMFYUI_SERVER` > 配置 `comfyui.server` > `http://127.0.0.1:8188`。
 超时（码 5）不是失败，任务仍在服务端跑，stdout 给出继续等待的命令。
 执行失败时节点级 `execution_error` 完整出现在 `jobs[].error`，那是修工作流的唯一线索。
+
 
 ## OpenAI 兼容接口
 
@@ -170,11 +192,11 @@ seed-image gemini-image edit --prompt '把第一张图的帽子戴到第二张�
 选路（默认优先 `gpt-image-2.5-flare`，即 `openai-image generate/edit`）：
 
 1. **文生图、多图合成、自然语言改图、要效果好** → `openai-image`，首选，不必碰工作流。
-2. **要透明背景的新素材**（图标、贴纸、UI 元素） → `openai-image` 直接加 `--background transparent`，一步到位，不要先出白底再抠。
+2. **要透明背景的新素材**（图标、贴纸、UI 元素） → `openai-image` 直接加 `--background transparent`，一步到位。
 3. **已有图片要去底/还原 alpha** → 也走 `openai-image edit --background transparent`，不要默认拉 ComfyUI。
-4. **只有用户明确要求用 ComfyUI 抠图时** 才走工作流：简单硬边缘用 `抠出图片中主体.json`；半透明、发丝、玻璃、模糊边缘用 `抠出图片中半透明或是不清晰边缘的主体.json`。
-5. **从一张图里取出某个元素的透明图** → 一次 `openai-image edit`：提示词说清只保留该元素 + `--background transparent`；用户指定走 ComfyUI 时再改成先提白底图 → 判断边缘类型 → 调对应抠图工作流。
-6. **简单快速的图片编辑、批量跑变体、不在意精细质量** → `flux2_klein.json`，10–20s/张，async 并发提交。
+4. **只有用户明确要求用 ComfyUI 抠图时** 才走工作流：硬边缘用 `bg-remove-auto.json`（不跑扩散，1–3s）；发丝、玻璃、半透明、模糊边缘用 `qwen-edit-turbo.json`。
+5. **从一张图里取出某个元素的透明图** → 先看 3、4：默认 `openai-image edit --background transparent`；用户指定走 ComfyUI 时先判断边缘类型，再调对应的抠图工作流。
+6. **简单快速的图片编辑、批量跑变体、不在意精细质量** → `qwen-edit-turbo.json`（~15s/张，本地现成）。
 7. **用户点名要 Gemini / Nano Banana**，或 gpt-image 效果不理想想换个模型对比 → `gemini-image`；其余情况仍走 `openai-image`。
 
 参数默认：
