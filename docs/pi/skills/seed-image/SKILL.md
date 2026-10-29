@@ -202,6 +202,7 @@ seed-image gemini-image edit --prompt '把第一张图的帽子戴到第二张�
 参数默认：
 
 - `--quality` 默认 `low`（快且省钱）；**只有用户明确写 `--quality high` 时才用 `high`**。
+- 不管质量高低，gpt-image 默认都用 `gpt-image-2.5-flare`，**只有用户明确写 `--model gpt-image-2.5-sunburst` 时才用 `gpt-image-2.5-sunburst`**。
 - `--size auto` 让模型跟随输入比例，除非用户指定尺寸。
 - 参数记录 json 默认不写；只有用户明确要留档/复现参数时才加 `--save-params`。
 - 多张变体优先 `--number N`（一次请求），跨提示词才用 shell 后台并发。
