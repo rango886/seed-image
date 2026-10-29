@@ -18,7 +18,7 @@ POSIX shell 下 `--values` 一律**单引号**（防 `{}` 展开与中文/空格
 
 ## ComfyUI 工作流
 
-| 文件 | 干什么 | 要输入图 | 耗时 | 关键参数 |
+| 文件 | 干什么 | 要输入图 | 耗时 | 参数 |
 | --- | --- | --- | --- | --- |
 | `krea2.json` | Krea2 文生图 | 不用 | 10–20s | `85.inputs.value` 提示词<br>`91`/`92.inputs.value` 宽/高<br>`30:3.inputs.seed` 种子 |
 | `qwen-edit.json` | Qwen-Image 2.1 改图（质量档），支持透明背景，可以当抠图模型| 要 | 30–60s | `470.inputs.image`<br>`503.inputs.value` 提示词 |
@@ -28,7 +28,7 @@ POSIX shell 下 `--values` 一律**单引号**（防 `{}` 展开与中文/空格
 
 除 `krea2.json` 外都要 `--values '...=@upload{./x.png}'` 传图。所有 LoadImage 的 `image` 都已清空成 `""`，不传图直接跑会报找不到文件。
 
-改非关键参数前先知道这些：
+改参数前先知道这些：
 
 - **Qwen 改图两档结构一样**，区别只在模型和采样。推荐使用 Qwen-Image 2.1 Turbo，速度快，质量也不错。
 - 「优化提示词」开关（`qwen-edit.json` 的 `504`、`qwen-edit-turbo`  的 `510`）**默认关着**。开了会先用 `qwen3.5_9b_qwen_image_2.1_pe_i2i` 把提示词扩写一遍再进编码器，多花几十秒，而且占用很大显存；推荐ai agent 调用的时候直接写提示词，不用这个优化提示词开关，这个开关是给人类用的（`--values '504.inputs.value=true'`）。
@@ -61,7 +61,7 @@ seed-image comfyui job submit --workflow $WF/qwen-cutout-prompt.json \
 seed-image comfyui job submit --workflow $WF/bg-remove-auto.json \
   --values '23.inputs.image=@upload{./logo.png}' --output-path out --format json
 
-# 改清单外的参数前先自省，别把整个 json 读进上下文
+# 改上面表格以外的参数前先自省，别把整个 json 读进上下文，基本不需要改上面表格以外的参数，列出的参数都经过测试，够用了
 seed-image comfyui workflow inspect $WF/qwen-edit-turbo.json --filter text
 seed-image comfyui job submit --workflow $WF/krea2.json --values '30:3.inputs.seed=42' --dry-run  # 只看补丁结果
 ```
