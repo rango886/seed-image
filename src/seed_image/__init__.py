@@ -5,10 +5,12 @@ from __future__ import annotations
 import sys
 
 from .cli.app import app
+from .netenv import sanitize_proxy_env
 
 
 def main() -> None:
     _force_utf8()
+    sanitize_proxy_env()
     app()
 
 
