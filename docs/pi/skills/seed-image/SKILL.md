@@ -1,6 +1,6 @@
 ---
 name: seed-image
-description: 用 seed-image 命令行生成/编辑图片。后端三选一：OpenAI 兼容 images 接口（gpt-image，默认首选）、Gemini 原生图片接口（Nano Banana）、本地 ComfyUI 工作流（krea2 文生图、Qwen 单图/多图参考改图、抠图/去背景、SeedVR2 放大）。出图、改图、多图合成、透明背景素材、抠图、放大、批量生成变体时使用。
+description: 用 seed-image 命令行生成/编辑图片。后端三选一：OpenAI 兼容 images 接口（gpt-image，默认首选）、Gemini 原生图片接口（Nano Banana）、本地 ComfyUI 工作流（krea2 文生图、flux3 klein 改图、Qwen 单图/多图参考改图、抠图/去背景、SeedVR2 放大）。出图、改图、多图合成、透明背景素材、抠图、放大、批量生成变体时使用。
 ---
 
 # seed-image
@@ -15,8 +15,8 @@ description: 用 seed-image 命令行生成/编辑图片。后端三选一：Ope
 | 要透明背景的新素材（图标、贴纸、UI 元素） | `openai-image generate --background transparent` |
 | 已有图去底 / 还原 alpha | `openai-image edit --background transparent` |
 | 用户**明确要求用 ComfyUI** 抠图 | 硬边缘 → `bg-remove-auto.json`；发丝、玻璃、半透明 → `qwen-edit-turbo.json` |
-| 简单快速改图、批量跑变体、不在意精细质量 | `qwen-edit-turbo.json`（本地，约 15s/张） |
-| 本地多图参考改图（最多 16 张） | `qwen-edit-turbo.json` + `--multi` |
+| 本地改图要质量、要快（约 10s/张），不想走 API | `flux3-klein-edit.json`（Flux3 Klein，本地最好的一档） |
+| 本地多图参考改图 | `flux3-klein-edit.json`（最多 16 张）或 `qwen-edit-turbo.json`（最多 16 张）+ `--multi` |
 | 放大并补细节 | `seedvr2-upscale.json` |
 | 用户点名要 Gemini / Nano Banana，或想换个模型对比 | `gemini-image` |
 
@@ -102,7 +102,8 @@ seed-image gemini-image edit --prompt '把第一张图的帽子戴到第二张�
 | 文件 | 干什么 | 耗时 | 常用参数路径 |
 | --- | --- | --- | --- |
 | `krea2.json` | Krea2 文生图 | 10–20s | 提示词 `85.inputs.value`<br>宽 `91.inputs.value` / 高 `92.inputs.value`<br>种子 `30:3.inputs.seed` |
-| `qwen-edit-turbo.json` | Qwen-Image 2.1 Turbo 改图（快档，**推荐**） | ~15s | 图 `470.inputs.image`<br>提示词 `509.inputs.value`<br>种子 `459:504.inputs.noise_seed` |
+| `flux3-klein-edit.json` | Flux3 Klein 改图，本地质量最好（**改图首选本地档**） | ~10s | 图 `11.inputs.image`<br>提示词 `54.inputs.value`<br>种子 `7.inputs.seed` |
+| `qwen-edit-turbo.json` | Qwen-Image 2.1 Turbo 改图（快档） | ~15s | 图 `470.inputs.image`<br>提示词 `509.inputs.value`<br>种子 `459:504.inputs.noise_seed` |
 | `qwen-edit.json` | Qwen-Image 2.1 改图（质量档） | 30–60s | 图 `470.inputs.image`<br>提示词 `503.inputs.value`<br>种子 `459:458.inputs.seed` |
 | `bg-remove-auto.json` | 纯抠图，不跑扩散，硬边缘 | 1–3s | 图 `23.inputs.image`<br>模型 `22:14.inputs.bg_removal_name` |
 | `seedvr2-upscale.json` | SeedVR2 放大并补细节 | 看倍数 | 图 `1.inputs.image`<br>倍数 `77.inputs.value`（1–4，默认 4） |
@@ -114,7 +115,7 @@ seed-image gemini-image edit --prompt '把第一张图的帽子戴到第二张�
 - **种子是写死在文件里的固定值**。同一提示词、同一种子，出的图一模一样。跑多张变体时，每次都要传不同的种子。
 - **所有 LoadImage 的 `image` 都清空成了 `""`**。除 krea2 外都必须传图，否则会报找不到文件。
 - **Qwen 两档**结构一样，只是模型和采样不同。两档都能当抠图模型用：在提示词里写"透明背景"，就会输出带 alpha 的图，工作流里没有单独的透明开关。
-- **Qwen 的输出尺寸跟随第一张图**。多图时，要被修改的那张底图必须放第一张（`<image1>`），其余图作为素材来源。
+- **Qwen 和 flux3-klein 的输出尺寸跟随第一张图**。多图时，要被修改的那张底图必须放第一张（`<image1>`），其余图作为素材来源。
 - **Qwen 的"优化提示词"开关**（turbo 是 `510.inputs.value`，质量档是 `504.inputs.value`）默认关闭，**agent 不要打开**。打开后会先用一个 9B 模型把提示词扩写一遍，多花几十秒、多占很多显存。这是给人用的，agent 直接写清楚提示词就行。
 - **`bg-remove-auto`**：`bg_removal_name` 只有两个可选值。`lucida.safetensors` 是默认，细节多、发丝好、支持半透明；`birefnet.safetensors` 边缘稳，但没有透明度。
 - **`seedvr2-upscale`**：显存吃紧时把倍数降到 2；采样参数别动。
@@ -132,14 +133,28 @@ seed-image gemini-image edit --prompt '把第一张图的帽子戴到第二张�
 
 - 同一路径写几次，就是几张图。第 1 次填原节点，之后每多 1 次，就把节点复制一份（`470_2`、`470_3`…），接到下游多图口的下一个空位。
 - 命令行里的顺序就是图的编号，提示词里**必须用 `<image1>`、`<image2>`… 指代各张图**。
-- 两个 Qwen 工作流都支持，最多 16 张。工作流本来只吃一张图时会报 `multi_no_slot`。
+- Qwen 和 flux3-klein 工作流都支持，最多 16 张。工作流本来只吃一张图时会报 multi_no_slot。
 
 ### 示例
 
 ```bash
 WF=~/.config/seed-image/comfyui-workflows
 
-# 改图
+# Flux3 Klein 改图（本地质量最好，必须传图）
+seed-image comfyui job submit --workflow $WF/flux3-klein-edit.json \
+  --values '11.inputs.image=@upload{./cat.png}' \
+  --values '54.inputs.value=把背景换成雪山黄昏，主体不变' \
+  --output-path out --format json
+
+# Flux3 Klein 多图改图 + 出更大的图
+seed-image comfyui job submit --workflow $WF/flux3-klein-edit.json \
+  --multi '11.inputs.image=@upload{./person.png}' \
+  --multi '11.inputs.image=@upload{./hat.png}' \
+  --values '54.inputs.value=让<image1>中的人戴上<image2>中的帽子' \
+  --values '17.inputs.resolution.megapixels=2' \
+  --output-path out --format json
+
+# 快档改图（Qwen Turbo）
 seed-image comfyui job submit --workflow $WF/qwen-edit-turbo.json \
   --values '470.inputs.image=@upload{./cat.png}' \
   --values '509.inputs.value=把背景换成雪山黄昏' \
