@@ -73,6 +73,15 @@ def cancel_job(client: httpx.Client, job_id: str) -> dict[str, Any]:
     return _as_json(_send(client, "POST", f"/api/jobs/{job_id}/cancel"))
 
 
+def get_object_info(client: httpx.Client, class_type: str) -> dict[str, Any] | None:
+    """取单个节点类型的 schema（输入口定义等）。服务端不认识这个类型时返回 None。"""
+    from urllib.parse import quote
+
+    body = _as_json(_send(client, "GET", f"/api/object_info/{quote(class_type, safe='')}"))
+    info = body.get(class_type)
+    return info if isinstance(info, dict) else None
+
+
 def fetch_view(client: httpx.Client, *, filename: str, subfolder: str, type_: str) -> bytes:
     """按输出条目取回文件字节。"""
     params = {"filename": filename, "subfolder": subfolder, "type": type_}

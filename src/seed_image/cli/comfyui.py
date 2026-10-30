@@ -14,6 +14,7 @@ from ..comfy import client as api
 from ..comfy import outputs as products
 from ..comfy import service
 from ..comfy.waiting import CANCELLED, FAILED, WaitOutcome, wait_for_jobs
+from ..core.fanout import Schema
 from ..core.values import parse_assignment
 from ..core.workflow import inspect_inputs, load_workflow
 from ..errors import AppError, ExitCode
@@ -35,12 +36,24 @@ SUBMIT_EPILOG = """\b
   # 本地文件用 @upload{...} 包围，提交前自动上传（图片/视频/音频/文本通用）
   seed-image comfyui job submit --workflow wf.json \\
     --values "10.inputs.image=@upload{./cat.png}" --mode async
+
+  # 多图：同一条路径写几次 --multi，节点就复制几份并接到下游的多图口
+  seed-image comfyui job submit --workflow qwen-edit-turbo.json \\
+    --multi "470.inputs.image=@upload{./a.png}" \\
+    --multi "470.inputs.image=@upload{./b.png}" \\
+    --values "509.inputs.value=把<image2>的帽子戴到<image1>的人头上"
 """
 
 VALUES_HELP = (
     "path=value，可重复。值按 JSON 字面量解析（42→数字、true→布尔、[..]→数组），"
     "解析不了就当字符串。需要上传的本地文件写成 @upload{./cat.png}，"
     "会先上传再把服务端文件名填回该位置。"
+)
+
+MULTI_HELP = (
+    "和 --values 同样的 path=value，但可以对同一路径写多次：第 1 次填原节点，"
+    "之后每多 1 次就把该节点复制一份（如 470_2、470_3），并接到下游多图口的下一个空位。"
+    "顺序即图的编号顺序（<image1>、<image2>...）。哪些口能多接由服务端 /object_info 决定。"
 )
 
 
@@ -54,6 +67,7 @@ def submit(
     ctx: typer.Context,
     workflow: Annotated[Path, typer.Option("--workflow", help="API 格式 workflow JSON")],
     values: Annotated[list[str] | None, typer.Option("--values", help=VALUES_HELP)] = None,
+    multi: Annotated[list[str] | None, typer.Option("--multi", help=MULTI_HELP)] = None,
     mode: Annotated[str, typer.Option("--mode", help="sync=等待并下载产物；async=返回 job id")] = "sync",
     output_path: Annotated[Path, typer.Option("--output-path", help="产物落盘目录")] = Path("."),
     timeout: Annotated[float, typer.Option("--timeout", help="sync 模式最长等待秒数")] = 300.0,
@@ -72,21 +86,32 @@ def submit(
         _require_on_timeout(on_timeout)
         graph = load_workflow(workflow)
         assignments = [parse_assignment(spec) for spec in (values or [])]
+        multi_items = [parse_assignment(spec) for spec in (multi or [])]
         if dry_run:
-            prepared = service.prepare(graph, assignments, service.naming_only_uploader)
+            schema = _offline_schema(base) if multi_items else None
+            prepared = service.prepare(
+                graph, assignments, service.naming_only_uploader, multi=multi_items, schema=schema
+            )
+            _report_expansions(prepared)
             body = json.dumps(prepared.workflow, ensure_ascii=False, indent=2)
-            return Output({"workflow": prepared.workflow, "uploaded": prepared.uploaded}, [body])
+            return Output(
+                {"workflow": prepared.workflow, "uploaded": prepared.uploaded} | _expanded(prepared),
+                [body],
+            )
         with api.make_client(base) as http:
             prepared = service.prepare(
-                graph, assignments, service.uploader(http), concurrency=concurrency
+                graph, assignments, service.uploader(http),
+                multi=multi_items, schema=service.schema_from(http), concurrency=concurrency,
             )
+            _report_expansions(prepared)
             for local, ref in prepared.uploaded.items():
                 note(f"uploaded {local} -> {ref}")
             job_id = service.submit(http, prepared.workflow)
             note(f"submitted job {job_id}")
             if mode == "async":
                 return Output(
-                    {"job_id": job_id, "status": "pending", "uploaded": dict(prepared.uploaded)},
+                    {"job_id": job_id, "status": "pending", "uploaded": dict(prepared.uploaded)}
+                    | _expanded(prepared),
                     [job_id],
                 )
             return _wait_and_collect(
@@ -214,6 +239,46 @@ def inspect(
         return Output({"inputs": slots}, lines)
 
     run(output_format, produce)
+
+
+def _offline_schema(base: str) -> Schema | None:
+    """--dry-run 也尽量用服务端 schema 判断多图口（只读）；连不上就退回猜测。"""
+    if not base:
+        note("未配置 ComfyUI 地址，--multi 按 key 名猜测多图口（未查 schema）")
+        return None
+    http = api.make_client(base, timeout=10.0)
+    lookup = service.schema_from(http)
+    state = {"online": True}
+
+    def schema(class_type: str):
+        if not state["online"]:
+            return None
+        try:
+            return lookup(class_type)
+        except AppError as exc:
+            if exc.code != "server_unreachable":
+                raise
+            state["online"] = False
+            note(f"连不上 {base}，--multi 按 key 名猜测多图口（未查 schema）")
+            return None
+
+    return schema
+
+
+def _expanded(prepared: service.Prepared) -> dict[str, Any]:
+    if not prepared.expanded:
+        return {}
+    return {
+        "expanded": [
+            {"source": e.source, "copies": list(e.copies), "wired": [f"{n}.inputs.{k}" for n, k in e.wired]}
+            for e in prepared.expanded
+        ]
+    }
+
+
+def _report_expansions(prepared: service.Prepared) -> None:
+    for e in prepared.expanded:
+        note(f"multi {e.source} -> {', '.join(e.copies)}")
 
 
 def _wait_and_collect(

@@ -15,6 +15,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 import httpx
 
+from ..core.fanout import Expansion, Schema, plan_multi
 from ..core.values import Assignment, apply_assignments, resolve_uploads, uploads_in
 from . import client as api
 
@@ -27,11 +28,24 @@ class Prepared:
 
     workflow: Mapping[str, Any]
     uploaded: Mapping[str, str]
+    expanded: Sequence[Expansion] = ()
 
 
 def uploader(http: httpx.Client) -> Upload:
     """真实上传器：把本地文件送进 ComfyUI 的 input 目录。"""
     return partial(api.upload_file, http)
+
+
+def schema_from(http: httpx.Client) -> Schema:
+    """按需查 /object_info，同一类型只查一次。"""
+    cache: dict[str, Mapping[str, Any] | None] = {}
+
+    def lookup(class_type: str) -> Mapping[str, Any] | None:
+        if class_type not in cache:
+            cache[class_type] = api.get_object_info(http, class_type)
+        return cache[class_type]
+
+    return lookup
 
 
 def naming_only_uploader(path: Path) -> str:
@@ -44,12 +58,26 @@ def prepare(
     assignments: Sequence[Assignment],
     upload: Upload,
     *,
+    multi: Sequence[Assignment] = (),
+    schema: Schema | None = None,
     concurrency: int = 4,
 ) -> Prepared:
-    """上传 --values 里用 @upload{...} 标记的文件，再把所有赋值应用到 workflow。"""
+    """按 --multi 复制节点 → 上传 @upload{...} 标记的文件 → 把所有赋值应用到 workflow。
+
+    --multi 先展开成指向各个副本的普通赋值，排在 --values 前面，
+    所以 --values 仍可以覆盖副本上的字段（比如 `470_2.inputs.xxx`）。
+    """
+    expansions: list[Expansion] = []
+    if multi:
+        workflow, rewritten, expansions = plan_multi(workflow, multi, schema)
+        assignments = [*rewritten, *assignments]
     refs = _upload_all(assignments, upload, concurrency)
     resolved = [resolve_uploads(item, refs) for item in assignments]
-    return Prepared(apply_assignments(workflow, resolved), {str(k): v for k, v in refs.items()})
+    return Prepared(
+        apply_assignments(workflow, resolved),
+        {str(k): v for k, v in refs.items()},
+        tuple(expansions),
+    )
 
 
 def submit(http: httpx.Client, workflow: Mapping[str, Any]) -> str:
