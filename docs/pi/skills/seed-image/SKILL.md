@@ -59,7 +59,7 @@ seed-image openai-image edit --prompt '只保留主体，完全去除背景，�
 | `--size` | `auto` | 或 `1024x1024` 等 |
 | `--background` | `auto` | auto/transparent/opaque；transparent 出带 alpha 的 PNG |
 | `--number` | 1 | 同一提示词多张变体用它（一次请求） |
-| `--output-path` | `.` | 落盘名为 `提示词前20字-序号-uuid.png` |
+| `--output-path` | `.` | 落盘名为 `提示词前20字-序号-uuid.png`（标点、空白换成下划线） |
 | `--save-params` | 不写 | 额外写一份参数记录 json |
 | `--timeout` / `--max-retries` | 300 / 2 | |
 

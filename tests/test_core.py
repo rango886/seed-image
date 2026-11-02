@@ -110,6 +110,22 @@ def test_image_name_shape():
     assert naming.image_name("夜景", 3, "abcd1234", "png") == "夜景-03-abcd1234.png"
 
 
+def test_prompt_slug_turns_punctuation_into_underscore():
+    assert naming.prompt_slug("夜景：很美，宽阔！啊") == "夜景_很美_宽阔_啊"
+    assert naming.prompt_slug("睡前故事·月亮（第二版）") == "睡前故事_月亮_第二版"
+    # 连续的标点只算一个分隔符，首尾的不留
+    assert naming.prompt_slug("  <<夜景>>...  ") == "夜景"
+    assert naming.prompt_slug("夜景😀很美") == "夜景_很美"
+    assert naming.prompt_slug("一" * 30) == "一" * naming.SLUG_LIMIT
+    # 截断刚好落在分隔符上时，不留尾巴
+    assert naming.prompt_slug("一" * 19 + "-二三") == "一" * 19
+    assert naming.prompt_slug("  ...  ") == "untitled"
+    assert naming.prompt_slug("a cat, neon night!") == "a_cat_neon_night"
+    assert naming.prompt_slug("con") == "_con"
+    assert naming.image_name("夜景,很美", 1, "abcd1234", "png") == "夜景_很美-01-abcd1234.png"
+    assert naming.sidecar_name("夜景,很美", "abcd1234") == "夜景_很美-abcd1234.json"
+
+
 def test_wait_reports_unfinished_on_timeout():
     outcome = wait_for_jobs(lambda job_id: {"status": "in_progress"}, ["a"], timeout=0.0, poll_interval=0.01)
     assert outcome.timed_out

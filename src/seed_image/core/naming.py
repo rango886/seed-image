@@ -11,6 +11,8 @@ import uuid
 from pathlib import Path
 
 _ILLEGAL = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+# \\w 在 Python 里是 Unicode 语义：汉字、字母、数字、下划线都算“字”。
+_NON_WORD = re.compile(r"[^\w]+")
 _RESERVED = {
     "CON", "PRN", "AUX", "NUL",
     *(f"COM{i}" for i in range(1, 10)),
@@ -33,14 +35,26 @@ def slug(text: str, limit: int = SLUG_LIMIT) -> str:
     return cleaned
 
 
+def prompt_slug(text: str, limit: int = SLUG_LIMIT) -> str:
+    """提示词 → 文件名片段：标点和空白都变成下划线，其余原样保留。
+
+    带标点的文件名在部分 markdown 前端里渲染不出来；又不舍得把字丢掉，
+    所以只把它们换成下划线当分隔符。emoji 之类非“字”字符也落进同一个坑。
+    """
+    cleaned = _NON_WORD.sub("_", text).strip("_")[:limit].strip("_")
+    if not cleaned:
+        return "untitled"
+    return f"_{cleaned}" if cleaned.upper() in _RESERVED else cleaned
+
+
 def image_name(prompt: str, index: int, uid: str, ext: str) -> str:
     """`生成个城市夜景-01-1a2b3c4d.png`（index 从 1 开始）。"""
-    return f"{slug(prompt)}-{index:02d}-{uid}.{ext.lstrip('.')}"
+    return f"{prompt_slug(prompt)}-{index:02d}-{uid}.{ext.lstrip('.')}"
 
 
 def sidecar_name(prompt: str, uid: str) -> str:
     """与一批图片同源的参数记录文件名。"""
-    return f"{slug(prompt)}-{uid}.json"
+    return f"{prompt_slug(prompt)}-{uid}.json"
 
 
 def output_name(job_id: str, node_id: str, filename: str) -> str:
