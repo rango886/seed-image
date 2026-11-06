@@ -35,7 +35,7 @@ COMFYUI_SERVER = Setting("comfyui.server", "COMFYUI_SERVER", "http://127.0.0.1:8
 # 环境变量一律用官方 SDK 的名字；走中转站就在配置文件里写 base_url / api_key。
 OPENAI_BASE_URL = Setting("openai.base_url", "OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_API_KEY = Setting("openai.api_key", "OPENAI_API_KEY", secret=True)
-OPENAI_MODEL = Setting("openai.model", default="gpt-image-2.5-flare")
+OPENAI_MODEL = Setting("openai.model", default="gpt-image-2.6-flare")
 # 与 google-genai SDK 一致：base_url 不含版本号，请求时自动接 /v1beta。
 GEMINI_BASE_URL = Setting("gemini.base_url", "GOOGLE_GEMINI_BASE_URL", "https://generativelanguage.googleapis.com")
 GEMINI_API_KEY = Setting("gemini.api_key", "GEMINI_API_KEY", secret=True)

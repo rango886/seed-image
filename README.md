@@ -31,7 +31,7 @@ server = "http://127.0.0.1:8188"
 [openai]
 base_url = "https://api.inferera.com/v1"
 api_key  = "sk-..."
-model    = "gpt-image-2.5-flare"
+model    = "gpt-image-2.6-flare"
 
 [gemini]
 base_url = "https://api.inferera.com/gemini"   # 不含 /v1beta，请求时自动接上
@@ -44,7 +44,7 @@ model    = "gemini-3.1-flash-image"
 | `comfyui.server` | `COMFYUI_SERVER` | `--server` | `http://127.0.0.1:8188` |
 | `openai.base_url` | `OPENAI_BASE_URL` | — | `https://api.openai.com/v1` |
 | `openai.api_key` | `OPENAI_API_KEY` | — | 无（必填） |
-| `openai.model` | — | `--model` | `gpt-image-2.5-flare` |
+| `openai.model` | — | `--model` | `gpt-image-2.6-flare` |
 | `gemini.base_url` | `GOOGLE_GEMINI_BASE_URL` | — | `https://generativelanguage.googleapis.com` |
 | `gemini.api_key` | `GEMINI_API_KEY` | — | 无（必填） |
 | `gemini.model` | — | `--model` | `gemini-3.1-flash-image` |
@@ -156,7 +156,13 @@ seed-image openai-image edit --prompt "把图一的帽子戴在图二的人物�
   --input-image a.png --input-image b.png --input-image c.png --output-path out
 ```
 
-- `--model`（默认取配置 `openai.model`，未配置则 `gpt-image-2.5-flare`）、`--size` / `--quality` / `--background` / `--number` 全部按字符串透传，
+| 模型 | 定位 |
+| --- | --- |
+| `gpt-image-2.6-flare`（默认） | 主力，日常生成与改图 |
+| `gpt-image-2.6-sunburst` | 复杂画面、一致性最强，慢且贵 |
+| `gpt-image-2.5-flare` / `gpt-image-2.5-sunburst` | 上一代，仍可用 |
+
+- `--model`（默认取配置 `openai.model`，未配置则 `gpt-image-2.6-flare`）、`--size` / `--quality` / `--background` / `--number` 全部按字符串透传，
   取值合法性由上游判定。
 - 输入图片读成 base64 data URL 后走 `images[].image_url` 传入。
 - 落盘命名：`提示词前20字-序号-uuid.png`，例如 `生成个城市夜景-01-1b7a6a49.png`；

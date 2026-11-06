@@ -19,7 +19,7 @@ server = "http://127.0.0.1:8188"
 [openai]
 base_url = "https://api.openai.com/v1"
 api_key  = "sk-..."
-model    = "gpt-image-2.5-flare"
+model    = "gpt-image-2.6-flare"
 
 [gemini]
 base_url = "https://generativelanguage.googleapis.com"   # 不含 /v1beta

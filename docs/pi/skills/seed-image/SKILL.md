@@ -22,7 +22,7 @@ description: 用 seed-image 命令行生成/编辑图片。后端三选一：Ope
 
 默认值规则（用户没另说就照这个来）：
 
-- `openai-image` 的模型用 `gpt-image-2.5-flare`。只有用户点名时才用 `gpt-image-2.5-sunburst`。
+- `openai-image` 的模型用 `gpt-image-2.6-flare`。只有用户点名时才用 `gpt-image-2.6-sunburst`。
 - `openai-image` **必须显式传 `--quality low`**（CLI 自己的默认是 `auto`）。只有用户明确要求时才用 `high`。
 - `--size auto`，跟随输入比例，除非用户指定尺寸。
 - 不加 `--save-params`，除非用户要留档或复现参数。
@@ -55,7 +55,7 @@ seed-image openai-image edit --prompt '只保留主体，完全去除背景，�
 | --- | --- | --- |
 | `--prompt` | 必填 | |
 | `--input-image` | edit 必填 | 可重复，最多 16 张；提示词里用"图一/图二"按顺序指代 |
-| `--model` | `gpt-image-2.5-flare` | `gpt-image-2.5-sunburst`：复杂画面、一致性最强，慢且贵 |
+| `--model` | `gpt-image-2.6-flare` | `gpt-image-2.6-sunburst`：复杂画面、一致性最强，慢且贵 |
 | `--quality` | CLI 默认 `auto` | auto/low/medium/high，**agent 传 `low`** |
 | `--size` | `auto` | 或 `1024x1024` 等 |
 | `--background` | `auto` | auto/transparent/opaque；transparent 出带 alpha 的 PNG |
