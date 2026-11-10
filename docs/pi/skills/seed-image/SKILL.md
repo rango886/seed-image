@@ -15,9 +15,8 @@ description: 用 seed-image 命令行生成/编辑图片。后端三选一：Ope
 | 要透明背景的新素材（图标、贴纸、UI 元素） | `openai-image generate --background transparent` |
 | 已有图去底 / 还原 alpha | `openai-image edit --background transparent` |
 | 用户**明确要求用 ComfyUI** 抠图 | 硬边缘 → `bg-remove-auto.json`；发丝、玻璃、半透明 → `qwen-edit-turbo.json` |
-| 本地改图要质量、要快（约 10s/张），不想走 API | `flux3-klein-edit.json`（Flux3 Klein，本地最好的一档） |
-| 本地多图参考改图 | `flux3-klein-edit.json`（最多 16 张）或 `qwen-edit-turbo.json`（最多 16 张）+ `--multi` |
-| 放大并补细节 | `seedvr2-upscale.json` |
+| 用户**明确要求用 ComfyUI** 本地多图参考改图要质量、要快（约 10s/张），不想走 API | `flux3-klein-edit.json`（Flux3 Klein，本地最好的一档） |
+| 放大图片，增加图片像素 | `seedvr2-upscale.json` |
 | 用户点名要 Gemini / Nano Banana，或想换个模型对比 | `gemini-image` |
 
 默认值规则（用户没另说就照这个来）：
@@ -57,7 +56,8 @@ seed-image openai-image edit --prompt '只保留主体，完全去除背景，�
 | `--input-image` | edit 必填 | 可重复，最多 16 张；提示词里用"图一/图二"按顺序指代 |
 | `--model` | `gpt-image-2.6-flare` | `gpt-image-2.6-sunburst`：复杂画面、一致性最强，慢且贵 |
 | `--quality` | CLI 默认 `auto` | auto/low/medium/high，**agent 传 `low`** |
-| `--size` | `auto` | 或 `1024x1024` 等 |
+| `--size` | `auto` | size = "auto" 或 "WIDTHxHEIGHT" ，WIDTH、HEIGHT 都必须是 16 的倍数，1/3 ≤ WIDTH / HEIGHT ≤ 3，每边最大长度 3840 像素 |
+| `--complexity` | 默认 `high` | low 适合 局部定点编辑、只换背景 / 改颜色 / 改招牌文字、只改一小块，要求原图大部分保持原样/medium 适合普通单主体插画、产品图、简单海报，元素不多、关系不复杂，兼顾速度和构图稳定 /high 适合多物体、有空间遮挡、大量文字排版、严格布局、多角色互动、流程图 / 海报、元素之间有明确位置关系，**agent 默认不传,除非用户明确要求** |
 | `--background` | `auto` | auto/transparent/opaque；transparent 出带 alpha 的 PNG |
 | `--number` | 1 | 同一提示词多张变体用它（一次请求） |
 | `--output-path` | `.` | 落盘名为 `提示词前20字-序号-uuid.png`（标点、空白换成下划线） |

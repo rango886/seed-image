@@ -99,6 +99,27 @@ def test_other_models_keep_background():
     assert request.body["n"] == 2
 
 
+@pytest.mark.parametrize("complexity", [None, "low", "medium", "high", "future-level", ""])
+def test_complexity_is_optional_and_passed_through(complexity):
+    request = build_request(
+        prompt="p", model="gpt-image-2.6-flare", size="1536x864", quality="low",
+        background="auto", number="1", complexity=complexity,
+    )
+    assert request.body["size"] == "1536x864"
+    if complexity is None:
+        assert "complexity" not in request.body
+    else:
+        assert request.body["complexity"] == complexity
+
+
+def test_complexity_is_omitted_by_default():
+    request = build_request(
+        prompt="p", model="gpt-image-2.6-flare", size="auto", quality="auto",
+        background="auto", number="1",
+    )
+    assert "complexity" not in request.body
+
+
 def test_slug_strips_illegal_characters_and_truncates():
     assert naming.slug('夜景:很美/宽阔?啊') == "夜景很美宽阔啊"
     assert naming.slug("一" * 30) == "一" * naming.SLUG_LIMIT

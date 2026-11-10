@@ -25,6 +25,7 @@ image_app = typer.Typer(
 )
 
 MODEL_HELP = f"模型名（默认取配置 {config.OPENAI_MODEL.key}，未配置则 {config.OPENAI_MODEL.default}）"
+COMPLEXITY_HELP = "规划复杂度（GPT Image 2.6：low/medium/high），不传则请求不含此字段，由上游决定"
 
 GENERATE_EPILOG = """\b
 示例：
@@ -44,6 +45,7 @@ def generate(
     model: Annotated[str | None, typer.Option("--model", help=MODEL_HELP, show_default=False)] = None,
     size: Annotated[str, typer.Option("--size")] = "auto",
     quality: Annotated[str, typer.Option("--quality")] = "auto",
+    complexity: Annotated[str | None, typer.Option("--complexity", help=COMPLEXITY_HELP, show_default=False)] = None,
     background: Annotated[str, typer.Option("--background", help="背景，原样透传给接口")] = "auto",
     number: Annotated[str, typer.Option("--number", help="生成张数")] = "1",
     output_path: Annotated[Path, typer.Option("--output-path", help="图片落盘目录")] = Path("."),
@@ -57,7 +59,7 @@ def generate(
     def produce() -> Output:
         request = build_request(
             prompt=prompt, model=config.value(config.OPENAI_MODEL, model) or "", size=size, quality=quality,
-            background=background, number=number,
+            background=background, number=number, complexity=complexity,
         )
         client = api.make_client(timeout=timeout, max_retries=max_retries)
         response = api.generate(client, request)
@@ -79,6 +81,7 @@ def edit(
     model: Annotated[str | None, typer.Option("--model", help=MODEL_HELP, show_default=False)] = None,
     size: Annotated[str, typer.Option("--size")] = "auto",
     quality: Annotated[str, typer.Option("--quality")] = "auto",
+    complexity: Annotated[str | None, typer.Option("--complexity", help=COMPLEXITY_HELP, show_default=False)] = None,
     background: Annotated[str, typer.Option("--background", help="背景，原样透传给接口")] = "auto",
     number: Annotated[str, typer.Option("--number", help="生成张数")] = "1",
     output_path: Annotated[Path, typer.Option("--output-path", help="图片落盘目录")] = Path("."),
@@ -93,7 +96,7 @@ def edit(
         request = with_images(
             build_request(
                 prompt=prompt, model=config.value(config.OPENAI_MODEL, model) or "", size=size, quality=quality,
-                background=background, number=number,
+                background=background, number=number, complexity=complexity,
             ),
             tuple(input_image),
         )

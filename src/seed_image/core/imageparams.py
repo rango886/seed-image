@@ -1,6 +1,6 @@
 """OpenAI 图片接口的请求体构造。纯函数。
 
-不校验取值（model/size/quality/background 由上游负责报错），只把 CLI 的字符串参数
+不校验取值（model/size/quality/complexity/background 由上游负责报错），只把 CLI 的字符串参数
 装配成请求体，参数原样透传。
 """
 
@@ -30,6 +30,7 @@ def build_request(
     quality: str,
     background: str,
     number: str,
+    complexity: str | None = None,
 ) -> ImageRequest:
     body = {
         "model": model,
@@ -39,6 +40,8 @@ def build_request(
         "background": background,
         "n": _as_count(number),
     }
+    if complexity is not None:
+        body["complexity"] = complexity
     return ImageRequest(body)
 
 
