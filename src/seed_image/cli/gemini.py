@@ -28,10 +28,7 @@ gemini_app = typer.Typer(
 GENERATE_EPILOG = """\b
 示例：
   seed-image gemini-image generate --prompt "写着「开业大吉」的红色海报" --aspect-ratio 3:4
-"""
-EDIT_EPILOG = """\b
-示例：
-  seed-image gemini-image edit --prompt "把第一张图的帽子戴到第二张图的人头上" \\
+  seed-image gemini-image generate --prompt "把第一张图的帽子戴到第二张图的人头上" \\
     --input-image a.png --input-image b.png
 """
 
@@ -61,10 +58,18 @@ TimeoutOption = Annotated[float, typer.Option("--timeout", help="单次请求超
 RetriesOption = Annotated[int, typer.Option("--max-retries", help="网络错误 / 429 / 5xx 的重试次数")]
 
 
-@gemini_app.command("generate", epilog=GENERATE_EPILOG, help="文生图，返回落盘的图片路径列表。")
+@gemini_app.command(
+    "generate",
+    epilog=GENERATE_EPILOG,
+    help=f"文生图，或传 --input-image 编辑/融合本地图片（最多 {gp.MAX_IMAGES} 张，顺序即“第一张/第二张”），返回落盘的图片路径列表。",
+)
 def generate(
     ctx: typer.Context,
-    prompt: Annotated[str, typer.Option("--prompt", help="生成提示词")],
+    prompt: Annotated[str, typer.Option("--prompt", help="生成或编辑提示词")],
+    input_image: Annotated[
+        list[Path] | None,
+        typer.Option("--input-image", help="本地参考图，可重复；按 base64 内联，排在指令前"),
+    ] = None,
     model: ModelOption = None,
     aspect_ratio: AspectOption = None,
     image_size: SizeOption = None,
@@ -78,36 +83,9 @@ def generate(
 ) -> None:
     output_format = resolve_format(ctx, fmt)
     run(output_format, lambda: _produce(
-        prompt=prompt, inputs=(), model=model, aspect_ratio=aspect_ratio, image_size=image_size,
+        prompt=prompt, inputs=tuple(input_image or ()), model=model, aspect_ratio=aspect_ratio, image_size=image_size,
         number=number, concurrency=concurrency, output_path=output_path, save_params=save_params,
         timeout=timeout, max_retries=max_retries,
-    ))
-
-
-@gemini_app.command(
-    "edit", epilog=EDIT_EPILOG,
-    help=f"按提示词编辑/融合本地图片（最多 {gp.MAX_IMAGES} 张，顺序即“第一张/第二张”），返回落盘的图片路径列表。",
-)
-def edit(
-    ctx: typer.Context,
-    prompt: Annotated[str, typer.Option("--prompt", help="编辑指令")],
-    input_image: Annotated[list[Path], typer.Option("--input-image", help="本地参考图，可重复；按 base64 内联，排在指令前")],
-    model: ModelOption = None,
-    aspect_ratio: AspectOption = None,
-    image_size: SizeOption = None,
-    number: NumberOption = 1,
-    concurrency: ConcurrencyOption = 4,
-    output_path: OutputOption = Path("."),
-    save_params: SaveParamsOption = False,
-    timeout: TimeoutOption = 300.0,
-    max_retries: RetriesOption = 2,
-    fmt: FormatOption = None,
-) -> None:
-    output_format = resolve_format(ctx, fmt)
-    run(output_format, lambda: _produce(
-        prompt=prompt, inputs=tuple(input_image), model=model, aspect_ratio=aspect_ratio,
-        image_size=image_size, number=number, concurrency=concurrency, output_path=output_path,
-        save_params=save_params, timeout=timeout, max_retries=max_retries,
     ))
 
 

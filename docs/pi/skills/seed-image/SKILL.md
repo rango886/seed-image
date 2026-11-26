@@ -1,6 +1,6 @@
 ---
 name: seed-image
-description: 用 seed-image 命令行生成/编辑图片。后端三选一：OpenAI 兼容 images 接口（gpt-image，默认首选）、Gemini 原生图片接口（Nano Banana）、本地 ComfyUI 工作流（krea2 文生图、flux3 klein 改图、Qwen 单图/多图参考改图、抠图/去背景、SeedVR2 放大）。出图、改图、多图合成、透明背景素材、抠图、放大、批量生成变体时使用。
+description: 用 seed-image 命令行生成/编辑图片。后端四选一：OpenAI 兼容 images 接口（gpt-image，默认首选）、Gemini 原生图片接口（Nano Banana）、AIHubMix 原生图片协议（豆包 Seedream 5.5、Grok Imagine 2.0 等聚合模型）、本地 ComfyUI 工作流（krea2 文生图、flux3 klein 改图、Qwen 单图/多图参考改图、抠图/去背景、SeedVR2 放大）。出图、改图、多图合成、透明背景素材、抠图、放大、批量生成变体时使用。
 ---
 
 # seed-image
@@ -11,13 +11,14 @@ description: 用 seed-image 命令行生成/编辑图片。后端三选一：Ope
 
 | 需求 | 用什么 |
 | --- | --- |
-| 文生图、自然语言改图、多图合成，要效果好 | `openai-image generate/edit`（**默认**） |
+| 文生图、自然语言改图、多图合成，要效果好 | `openai-image generate`（**默认**；加 `--input-image` 即改图） |
 | 要透明背景的新素材（图标、贴纸、UI 元素） | `openai-image generate --background transparent` |
-| 已有图去底 / 还原 alpha | `openai-image edit --background transparent` |
+| 已有图去底 / 还原 alpha | `openai-image generate --input-image a.png --background transparent` |
 | 用户**明确要求用 ComfyUI** 抠图 | 硬边缘 → `bg-remove-auto.json`；发丝、玻璃、半透明 → `qwen-edit-turbo.json` |
 | 用户**明确要求用 ComfyUI** 本地多图参考改图要质量、要快（约 10s/张），不想走 API | `flux3-klein-edit.json`（Flux3 Klein，本地最好的一档） |
 | 放大图片，增加图片像素 | `seedvr2-upscale.json` |
-| 用户点名要 Gemini / Nano Banana，或想换个模型对比 | `gemini-image` |
+| 用户点名要 Gemini / Nano Banana，或想换个模型对比 | `gemini-image generate` |
+| 用户点名要豆包 Seedream、Grok Imagine 或其他 AIHubMix 模型 | `aihubmix generate --model ...` |
 
 默认值规则（用户没另说就照这个来）：
 
@@ -43,17 +44,17 @@ seed-image openai-image generate --prompt '城市夜景，霓虹倒影' --qualit
 seed-image openai-image generate --prompt '一只柯基的贴纸，纯净透明背景' \
   --background transparent --quality low --output-path out --format json
 
-seed-image openai-image edit --prompt '把图一的帽子戴到图二的人身上' \
+seed-image openai-image generate --prompt '把图一的帽子戴到图二的人身上' \
   --input-image a.png --input-image b.png --quality low --output-path out --format json
 
-seed-image openai-image edit --prompt '只保留主体，完全去除背景，保留边缘细节与半透明' \
+seed-image openai-image generate --prompt '只保留主体，完全去除背景，保留边缘细节与半透明' \
   --input-image a.png --background transparent --quality low --output-path out --format json
 ```
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
 | `--prompt` | 必填 | |
-| `--input-image` | edit 必填 | 可重复，最多 16 张；提示词里用"图一/图二"按顺序指代 |
+| `--input-image` | 可选 | 不传为文生图，传了走编辑（最多 16 张；提示词里用"图一/图二"按顺序指代） |
 | `--model` | `gpt-image-2.6-flare` | `gpt-image-2.6-sunburst`：复杂画面、一致性最强，慢且贵 |
 | `--quality` | CLI 默认 `auto` | auto/low/medium/high，**agent 传 `low`** |
 | `--size` | `auto` | size = "auto" 或 "WIDTHxHEIGHT" ，WIDTH、HEIGHT 都必须是 16 的倍数，1/3 ≤ WIDTH / HEIGHT ≤ 3，每边最大长度 3840 像素 |
@@ -90,13 +91,51 @@ wait
 
 ```bash
 seed-image gemini-image generate --prompt '写着「开业大吉」的红色海报' --aspect-ratio 3:4 --output-path out --format json
-seed-image gemini-image edit --prompt '把第一张图的帽子戴到第二张图的人头上' \
+seed-image gemini-image generate --prompt '把第一张图的帽子戴到第二张图的人头上' \
   --input-image a.png --input-image b.png --output-path out --format json
 ```
 
 安全类别已在代码里全部关成 `OFF`。如果仍然报 `blocked`（服务端硬拦截）或 `no_image`（只回了文字），原因在 `error.details`；改提示词，或者换回 openai-image。
 
-## 5. ComfyUI 工作流
+## 5. aihubmix（多模型原生接口）
+
+统一入口都是 `seed-image aihubmix generate`（不传 `--input-image` 为文生图，传了就是参考/编辑）。
+只把显式传入的选项放进请求体，避免触发不支持字段的 `schema_violation`。
+
+### 常用模型速查
+
+| 模型（`--model`） | 尺寸参数 | 参考图（`--input-image`） | 其它支持参数 / 特色 |
+| --- | --- | --- | --- |
+| `doubao-seedream-5-5` | `--size`：默认 `2048x2048`；可传 `1K` / `1.5K` / `2K` 或 `WIDTHxHEIGHT`（总像素 `921600`–`4624220`，比例 `1:16`–`16:1`）。**不支持 `--aspect-ratio`** | 支持，最多 10 张（本地路径或 URL） | `--background`（`auto`/`transparent`/`opaque`，`transparent` 仅限 png）<br>`--output-format`（`png`/`jpeg`）<br>`--number` 固定 `1`（不支持一次多张）<br>`--extra watermark=false`（去右下角 AI 水印，默认 true）<br>`--extra optimize_prompt_options.mode=standard` |
+| `grok-imagine-image-2.0` | `--aspect-ratio`（`1:1`/`16:9`/`9:16`/`4:3`/`3:4`/`3:2`/`2:3`/`2:1`/`1:2`/`19.5:9`/`9:19.5`/`20:9`/`9:20`/`21:9`/`5:2`/`auto`）+ `--resolution`（`1K`/`1.5K`/`2K`）。**不支持 `--size`** | 支持，最多 5 张（本地路径或 URL） | `--number` 支持 `1`–`10`<br>无 `--background` / `--output-format` / `extra` |
+
+```bash
+# 豆包 Seedream 5.5 文生图（去水印）
+seed-image aihubmix generate --model doubao-seedream-5-5 \
+  --prompt '阳光洒进花店木窗，胶片质感' --size 2048x2048 --extra watermark=false \
+  --output-path out --format json
+
+# 豆包 Seedream 5.5 参考图编辑 / 透明背景素材
+seed-image aihubmix generate --model doubao-seedream-5-5 \
+  --prompt '把背景换成雪山黄昏，主体不变' --input-image a.png \
+  --extra watermark=false --output-path out --format json
+
+# Grok Imagine 2.0（用 aspect-ratio + resolution）
+seed-image aihubmix generate --model grok-imagine-image-2.0 \
+  --prompt '赛博朋克雨夜街道，霓虹倒影' --aspect-ratio 16:9 --resolution 2K \
+  --output-path out --format json
+```
+
+### 其他模型与通用参数
+
+- 上表之外的模型，先查参数再调用，不要盲猜字段：
+  `seed-image aihubmix model list --format json`
+  `seed-image aihubmix model inspect <model_id> --format json`
+- 扩展参数：`--extra key=value` 写入请求体 `extra`（支持 `a.b=value` 和 JSON 字面量），`--param key=value` 写入顶层；调试可用 `--dry-run`。
+- 输入图字段：`--image-field auto` 默认 1 张放 `image`、多张放 `images`；遇到只认其中一种的模型可显式指定 `--image-field image` 或 `images`。总请求体上限 32 MiB。
+- 异步长任务：`--mode poll`（异步提交并轮询直到下载）或 `--mode async`（立即返回 `task_id`），批量收网用 `seed-image aihubmix task wait ID1 ID2 --output-path out --timeout 600 --format json`；sync 超时丢响应可用 `seed-image aihubmix task list --format json` 找回。
+
+## 6. ComfyUI 工作流
 
 工作流目录：`~/.config/seed-image/comfyui-workflows`（下文记作 `$WF`）。服务器地址已配好。
 
@@ -108,6 +147,7 @@ seed-image gemini-image edit --prompt '把第一张图的帽子戴到第二张�
 | `qwen-edit.json` | Qwen-Image 2.1 改图（质量档） | 30–60s | 图 `470.inputs.image`<br>提示词 `503.inputs.value`<br>种子 `459:458.inputs.seed` |
 | `bg-remove-auto.json` | 纯抠图，不跑扩散，硬边缘 | 1–3s | 图 `23.inputs.image`<br>模型 `22:14.inputs.bg_removal_name` |
 | `seedvr2-upscale.json` | SeedVR2 放大并补细节 | 看倍数 | 图 `1.inputs.image`<br>倍数 `77.inputs.value`（1–4，默认 4） |
+| `z_image_turbo.json` | z image turbo 生图模型| 5-10s | 提示词 `62.inputs.value`<br>宽 `63.inputs.value` / 高 `64.inputs.value`<br>种子 `65.inputs.seed` |
 
 **表里的参数都测过，基本够用，不用去改别的。** 实在要改，先用 `workflow inspect --filter 关键字` 查路径，不要把整个 workflow json 读进上下文。
 

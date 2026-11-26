@@ -1,6 +1,6 @@
 # seed-image
 
-给 AI agent 用的图像生成 CLI：包装本地 ComfyUI 的 HTTP 接口、OpenAI 兼容的图片生成/编辑接口，以及 Gemini 原生图片接口（Nano Banana）。
+给 AI agent 用的图像生成 CLI：包装本地 ComfyUI 的 HTTP 接口、OpenAI 兼容的图片接口、Gemini 原生图片接口（Nano Banana）以及 AIHubMix 原生图片协议。
 
 设计取向：**stdout 只放结果，stderr 放进度，退出码有契约，失败一定带上游报文。**
 
@@ -37,6 +37,11 @@ model    = "gpt-image-2.6-flare"
 base_url = "https://api.inferera.com/gemini"   # 不含 /v1beta，请求时自动接上
 api_key  = "sk-..."
 model    = "gemini-3.1-flash-image"
+
+[aihubmix]
+base_url = "https://aihubmix.com"
+api_key  = "sk-..."
+model    = "doubao-seedream-5-5"
 ```
 
 | 配置项 | 环境变量 | 命令行 | 默认值 |
@@ -48,6 +53,9 @@ model    = "gemini-3.1-flash-image"
 | `gemini.base_url` | `GOOGLE_GEMINI_BASE_URL` | — | `https://generativelanguage.googleapis.com` |
 | `gemini.api_key` | `GEMINI_API_KEY` | — | 无（必填） |
 | `gemini.model` | — | `--model` | `gemini-3.1-flash-image` |
+| `aihubmix.base_url` | `AIHUBMIX_BASE_URL` | — | `https://aihubmix.com` |
+| `aihubmix.api_key` | `AIHUBMIX_API_KEY` | — | 无（必填） |
+| `aihubmix.model` | — | `--model` | `doubao-seedream-5-5` |
 
 ```powershell
 seed-image config show              # 每一项最终生效的值和来源（api_key 打码）
@@ -152,7 +160,7 @@ seed-image comfyui workflow inspect wf.json [--filter text]          # 列出可
 
 ```powershell
 seed-image openai-image generate --prompt "生成个城市夜景" --number 2 --output-path out
-seed-image openai-image edit --prompt "把图一的帽子戴在图二的人物上，用图三的画风" `
+seed-image openai-image generate --prompt "把图一的帽子戴在图二的人物上，用图三的画风" `
   --input-image a.png --input-image b.png --input-image c.png --output-path out
 ```
 
@@ -162,9 +170,9 @@ seed-image openai-image edit --prompt "把图一的帽子戴在图二的人物�
 | `gpt-image-2.6-sunburst` | 复杂画面、一致性最强，慢且贵 |
 | `gpt-image-2.5-flare` / `gpt-image-2.5-sunburst` | 上一代，仍可用 |
 
-- `--model`（默认取配置 `openai.model`，未配置则 `gpt-image-2.6-flare`）、`--size` / `--quality` / `--background` / `--number` 全部按字符串透传，
+- 统一用 `generate` 命令：不传 `--input-image` 走 `/images/generations`，传了自动转 base64 data URL 走 `/images/edits`。
+- `--model`（默认取配置 `openai.model`，未配置则 `gpt-image-2.6-flare`）、`--size` / `--quality` / `--background` / `--moderation`（默认 `low`，支持 `low` / `auto`）/ `--number` 全部按字符串透传，
   取值合法性由上游判定。
-- 输入图片读成 base64 data URL 后走 `images[].image_url` 传入。
 - 落盘命名：`提示词前20字-序号-uuid.png`，例如 `生成个城市夜景-01-1b7a6a49.png`；
   提示词里的标点、空白一律换成下划线（连续多个只算一个，首尾不留）：带标点的文件名在部分 markdown 前端渲染不出来；
   加 `--save-params` 才额外写一份参数记录 `生成个城市夜景-1b7a6a49.json`（含请求参数、覆盖项、usage、
@@ -177,7 +185,7 @@ seed-image openai-image edit --prompt "把图一的帽子戴在图二的人物�
 
 ```powershell
 seed-image gemini-image generate --prompt "写着「开业大吉」的红色海报" --aspect-ratio 3:4 --image-size 2K --output-path out
-seed-image gemini-image edit --prompt "把第一张图的帽子戴到第二张图的人头上" `
+seed-image gemini-image generate --prompt "把第一张图的帽子戴到第二张图的人头上" `
   --input-image a.png --input-image b.png --output-path out
 ```
 
@@ -200,6 +208,34 @@ seed-image gemini-image edit --prompt "把第一张图的帽子戴到第二张�
   base_url 写错、拿到 HTML 时报 `unexpected_response` 并提示检查前缀。
 - 网络错误 / 429 / 5xx 按 `--max-retries`（默认 2）退避重试。落盘命名与 `--save-params` 同 openai-image。
 
+## seed-image aihubmix
+
+走 AIHubMix 原生图片协议 `/ai/v1/images/*`，密钥取自 `AIHUBMIX_API_KEY` 或配置 `aihubmix.api_key`，
+地址取自 `AIHUBMIX_BASE_URL` 或配置 `aihubmix.base_url`（默认 `https://aihubmix.com`）。
+
+```powershell
+# 同步出图（不传 --input-image 为文生图，传了自动进入编辑/参考模式）
+seed-image aihubmix generate --model doubao-seedream-5-5 --prompt "阳光洒进花店" --size 2048x2048 --extra watermark=false --output-path out
+seed-image aihubmix generate --model grok-imagine-image-2.0 --prompt "霓虹街景" --aspect-ratio 16:9 --resolution 2K --output-path out
+seed-image aihubmix generate --model doubao-seedream-5-5 --prompt "换成油画风格" --input-image cat.png --output-path out
+
+# 查可用模型与单个模型的原生接口参数 Schema（免鉴权）
+seed-image aihubmix model list
+seed-image aihubmix model inspect doubao-seedream-5-5
+
+# 异步提交与批量收网
+$id = seed-image aihubmix generate --model grok-imagine-image-2.0 --prompt "城市夜景" --mode async
+seed-image aihubmix task wait $id --output-path out --timeout 600
+seed-image aihubmix task list --limit 20
+```
+
+- **按模型组装参数**：仅把显式传入的可选参数放进请求体，避免触发不支持字段的 `schema_violation`；
+  模型专属扩展字段走 `--extra key=value`（进 `extra` 对象），顶层冷门字段走 `--param key=value`（支持 JSON 字面量）。
+- **输入图处理**：`--input-image` 支持本地路径（转 base64 data URL）或 `http(s)` URL，可重复；
+  `--image-field` 默认 `auto`（1 张放 `image`，多张放 `images`），也可显式指定 `image` 或 `images`。总请求体不能超过 32 MiB。
+- **执行模式**：`--mode sync`（默认同步）、`--mode poll`（`async: true` 后 CLI 自动轮询直到终态下载）、`--mode async`（立即返回 `task_id`）。
+- **结果下载**：自动兼容 `b64_json` 与需 Bearer 鉴权的 `content_url`；不可重提交的 502 错误码（如 `image_not_generated`）不会自动重试。
+
 ## 结构
 
 ```
@@ -207,10 +243,11 @@ src/seed_image/
   errors.py     失败的唯一表示 + 退出码契约
   config.py     用户配置：参数 > 环境变量 > 配置文件 > 默认值
   render.py     输出的唯一出口（Output / emit_error / note）
-  core/         纯函数：--values 解析与打补丁、workflow 自省、文件命名、请求体装配（OpenAI / Gemini）
+  core/         纯函数：--values 解析与打补丁、workflow 自省、文件命名、请求体装配（OpenAI / Gemini / AIHubMix）
   comfy/        ComfyUI：client(单次调用) / service(上传+补丁+入队) / waiting(轮询) / outputs(产物落盘)
-  images/       OpenAI 兼容图片接口：client(调用) / save(落盘与可选 sidecar，Gemini 共用)
+  images/       OpenAI 兼容图片接口：client(调用) / save(落盘与可选 sidecar，多后端共用)
   gemini/       Gemini generateContent：client(鉴权、重试、modality 降级、并发)
+  aihubmix/     AIHubMix 原生图片协议：client(生成/轮询/下载/模型 Schema 查询)
   cli/          Typer 命令：解析参数 → 调下层 → run() 收尾
 ```
 

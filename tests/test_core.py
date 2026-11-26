@@ -120,6 +120,20 @@ def test_complexity_is_omitted_by_default():
     assert "complexity" not in request.body
 
 
+def test_moderation_defaults_to_low_and_is_passed_through():
+    default_request = build_request(
+        prompt="p", model="gpt-image-2.6-flare", size="auto", quality="auto",
+        background="auto", number="1",
+    )
+    assert default_request.body["moderation"] == "low"
+
+    auto_request = build_request(
+        prompt="p", model="gpt-image-2.6-flare", size="auto", quality="auto",
+        background="auto", number="1", moderation="auto",
+    )
+    assert auto_request.body["moderation"] == "auto"
+
+
 def test_slug_strips_illegal_characters_and_truncates():
     assert naming.slug('夜景:很美/宽阔?啊') == "夜景很美宽阔啊"
     assert naming.slug("一" * 30) == "一" * naming.SLUG_LIMIT

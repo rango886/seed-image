@@ -25,6 +25,11 @@ model    = "gpt-image-2.6-flare"
 base_url = "https://generativelanguage.googleapis.com"   # 不含 /v1beta
 api_key  = "..."
 model    = "gemini-3.1-flash-image"
+
+[aihubmix]
+base_url = "https://aihubmix.com"
+api_key  = "sk-..."
+model    = "doubao-seedream-5-5"
 """
 
 

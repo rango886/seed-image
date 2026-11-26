@@ -40,10 +40,14 @@ OPENAI_MODEL = Setting("openai.model", default="gpt-image-2.6-flare")
 GEMINI_BASE_URL = Setting("gemini.base_url", "GOOGLE_GEMINI_BASE_URL", "https://generativelanguage.googleapis.com")
 GEMINI_API_KEY = Setting("gemini.api_key", "GEMINI_API_KEY", secret=True)
 GEMINI_MODEL = Setting("gemini.model", default="gemini-3.1-flash-image")
+AIHUBMIX_BASE_URL = Setting("aihubmix.base_url", "AIHUBMIX_BASE_URL", "https://aihubmix.com")
+AIHUBMIX_API_KEY = Setting("aihubmix.api_key", "AIHUBMIX_API_KEY", secret=True)
+AIHUBMIX_MODEL = Setting("aihubmix.model", default="doubao-seedream-5-5")
 SETTINGS = (
     COMFYUI_SERVER,
     OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL,
     GEMINI_BASE_URL, GEMINI_API_KEY, GEMINI_MODEL,
+    AIHUBMIX_BASE_URL, AIHUBMIX_API_KEY, AIHUBMIX_MODEL,
 )
 
 
